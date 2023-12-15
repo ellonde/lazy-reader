@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Simple Context Menu Extension",
+  "version": "1.0",
+  "permissions": ["storage", "contextMenus", "tabs", "activeTab", "scripting"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "app-icon.png",
+      "48": "app-icon.png",
+      "128": "app-icon.png"
+    }
+  },
+  "icons": {
+    "16": "app-icon.png",
+    "48": "app-icon.png",
+    "128": "app-icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js", "Readability.js"]
+    }
+  ]
+}
