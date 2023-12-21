@@ -1,10 +1,9 @@
-// In content.js
 let audioQueue = [];
 let isAudioPlaying = false;
 
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === "audioData") {
+    if (request.action === "audioData") {
         const audioData = request.data;
         if (audioData.length === 0) {
             return;
@@ -22,16 +21,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 
+
+
 function playNextInQueue() {
     
     if (audioQueue.length === 0) {
         isAudioPlaying = false;
+        chrome.runtime.sendMessage({ action: "setIcon", state: "idle" });
         return;
     }
     if (isAudioPlaying) {
         return;
     }
-
+    chrome.runtime.sendMessage({ action: "setIcon", state: "speaking" });
     isAudioPlaying = true;
     const audioData = audioQueue.shift();
     let arrayBuffer = Uint8Array.from(atob(audioData), c => c.charCodeAt(0));
@@ -47,6 +49,3 @@ function playNextInQueue() {
     };
     audio.play();
 }
-
-
-console.log("Content script loaded");

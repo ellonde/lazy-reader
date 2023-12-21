@@ -9,12 +9,11 @@ function getApiKey() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    console.log("DomContentLoaded")
     elementSetup('speed-dropdown', 'speed');
     elementSetup('speaker-dropdown', 'speaker');
     getUsage().then((usage) => {
         const usageElement = document.getElementById("usage");
-        usageElement.innerText = "$" + ((usage / 1000) * 0.015).toFixed(3) + " used";
+        usageElement.innerText = "$" + ((usage / 1000) * 0.015).toFixed(5) + " used";
     });
 });
 
@@ -30,14 +29,8 @@ function elementSetup(elementId, storageKey) {
         let storageObj = {};
         storageObj[storageKey] = element.value; // Using computed property names
         chrome.storage.sync.set(storageObj, function() {
-            console.log(storageKey + ' saved: ' + element.value);
         });
     });
-    // element.addEventListener('change', function() {
-    //     chrome.storage.sync.set({storageKey: element.value}, function() {
-    //         console.log(storageKey + ' saved: ' + element.value);
-    //     });
-    // });
 }
 
 function getUsage() {

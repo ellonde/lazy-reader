@@ -1,3 +1,5 @@
+SENTENCE_DELAY = 500 // ms
+
 
 function createContextMenuItem() {
 
@@ -8,8 +10,6 @@ function createContextMenuItem() {
     }, () => {
         if (chrome.runtime.lastError) {
             console.error(`Error: ${chrome.runtime.lastError.message}`);
-        } else {
-            console.log("Context menu item created successfully");
         }
     });
     chrome.contextMenus.create({
@@ -18,8 +18,6 @@ function createContextMenuItem() {
     }, () => {
         if (chrome.runtime.lastError) {
             console.error(`Error: ${chrome.runtime.lastError.message}`);
-        } else {
-            console.log("Context menu item created successfully");
         }
     });
 }
@@ -29,10 +27,9 @@ chrome.runtime.onInstalled.addListener((details) => {
         createContextMenuItem();
     });
     if (details.reason === "install") {
-        console.log("Extension installed, opening onboarding page");
-        chrome.tabs.create({ url: "onboarding.html" });
+        chrome.tabs.create({ url: "src/onboarding.html" });
     } else if (details.reason === "update") {
-        console.log("Extension updated");
+        chrome.tabs.create({ url: "src/onboarding.html" });
     }
 });
 
@@ -49,9 +46,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         }, (results) => {
             if (results && results.length > 0) {
                 const selectedText = results[0].result;
-                console.log('Selected text:', selectedText);
-                const chunks = selectedText.split(/\. |:/).filter(sentence => sentence.trim().length > 0);
-                processChunks(chunks, 0, tab.id);
+                ReadText(selectedText, tab.id);
             }
         });
     }
@@ -64,10 +59,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                 const fullText = results[0].result;
                 chrome.tabs.sendMessage(tab.id, { action: "confirmReading", textLength: fullText.length }, (response) => {
                     if (response.confirm) {
-                        const chunks = fullText.split(/\.|:/).filter(sentence => sentence.trim().length > 0);
-                        // processChunks(chunks, 0, tab.id);
-
-                        console.log("Running with speed: ",);
+                        ReadText(fullText, tab.id);
                     }
                 })
             }
@@ -75,6 +67,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     }
 });
 
+
+function ReadText(text, tabId) {
+    const chunks = text.split(/\. |:/).filter(sentence => sentence.trim().length > 0);
+    processChunks(chunks, 0, tabId);
+}
 
 function getSelectedText() {
     return window.getSelection().toString();
@@ -109,16 +106,38 @@ function arrayBufferToBase64(arrayBuffer) {
     return btoa(binaryString);
 }
 
+// Function to set the extension icon
+function setExtensionProcessing(action, tabId) {
+    const path = action === "speaking" ? 'speaking.png' : action === "processing" ? 'processing.png': 'app-icon.png'
+ 
+    chrome.action.setIcon({
+        path: {
+            "16": path,
+            "19": path,
+            "32": path,
+            "38": path
+        },
+        tabId: tabId
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('Error setting icon:', chrome.runtime.lastError);
+      }
+      console.log("set icon")
+    });
+  }
+  
+
 async function processChunk(chunk) {
     config = await getConfig();
+    
     const apiKey = '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'; // Store this securely
     const url = 'https://api.openai.com/v1/audio/speech';
     const text = cleanTextWithRegex(chunk);
     const data = {
-        model: getModelType(),
+        model: config.model,
         input: text,
-        voice: getSpeaker(),
-        speed: getSpeed()
+        voice: config.speaker,
+        speed: config.speed,
     };
 
     try {
@@ -132,6 +151,7 @@ async function processChunk(chunk) {
         });
 
         if (!response.ok) {
+            console.log("Error processing chunk", response.error, response.statsus, response.textContent)
             console.log("Skipping chunk", chunk);
             return "";
         }
@@ -146,121 +166,89 @@ async function processChunk(chunk) {
 }
 
 function setUsage(tokensUsed) {
-    const currentUsage = getUsage();
-    usage = currentUsage + tokensUsed;
-    chrome.storage.sync.set({ 'usage': usage }, function () {
-        console.log('Saved usage: ' + usage);
+    getUsage().then((usage) => {
+        const newUsage = usage + tokensUsed;
+        console.log("setting usage in bg:", usage, newUsage);
+        chrome.storage.sync.set({ 'usage': newUsage });    
     });
 }
 
 function getUsage() {
-    console.log('Getting usage');
-    chrome.storage.sync.get('usage', function (data) {
-        if (data.usage) {
-            return data.usage;
-        } else {
-            return 0;
-        }
+    return new Promise((resolve, reject) => {
+        chrome.storage.sync.get('usage', function(data) {
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError);
+            } else if (data.usage) {
+                resolve(data.usage);
+            } else {
+                resolve(0);
+            }
+        });
     });
 }
 
 function getConfig() {
     return new Promise((resolve, reject) => {
-        console.log('Getting speed');
-        data = {};
-        chrome.storage.sync.get('speed', function (data) {
-            if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-            } else if (data.speed) {
-                data['speed'] = data.speed;
-            } else {
-                data['speed'] = 1.0;
-            }
+        // Use Promise.all to wait for all storage data to be fetched
+        Promise.all([
+            getStorageData('speed', 1.0),
+            getStorageData('apiKey'),
+            getStorageData('speaker', 'onyx'),
+            getStorageData('model', 'standard')
+        ]).then(values => {
+            // Construct the data object from the resolved promises
+            const data = {
+                speed: values[0],
+                apiKey: values[1],
+                speaker: values[2],
+                model: values[3] === 'hd' ? 'tts-1-hd' : 'tts-1'
+            };
+            resolve(data);
+        }).catch(error => {
+            reject(error);
         });
-        chrome.storage.sync.get('apiKey', function (data) {
-            if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-            } else if (data.apiKey) {
-                data['apiKey'] = data.apiKey;
-            } else {
-                reject("No API key found");
-            }
-        });
-        chrome.storage.sync.get('speaker', function (data) {
-            if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-            } else if (data.speaker) {
-                data['speaker'] = data.speaker;
-            } else {
-                data['speaker'] = "onyx";
-            }
-        });
-        chrome.storage.sync.get('speaker', function (data) {
-            if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-            } else if (data.speaker) {
-                if (data.model === 'standard') {
-                    data['model'] = "tts-1";
-                } else if (data.model === 'hd') {
-                    data['model'] = "tts-1-hd";
-                }
-            } else {
-                data['speaker'] = "onyx";
-            }
-        });
-        resolve(data);
     });
 }
 
-function getSpeed() {
+// Helper function to fetch data from storage and return a promise
+function getStorageData(key, defaultValue = null) {
     return new Promise((resolve, reject) => {
-        console.log('Getting speed');
-        chrome.storage.sync.get('speed', function (data) {
+        chrome.storage.sync.get(key, function (result) {
             if (chrome.runtime.lastError) {
                 reject(chrome.runtime.lastError);
-            } else if (data.speed) {
-                resolve(data.speed);
+            } else if (result[key] !== undefined) {
+                resolve(result[key]);
+            } else if (defaultValue !== null) {
+                resolve(defaultValue);
             } else {
-                resolve(1.0);
+                reject(`No value found for ${key}`);
             }
         });
     });
 }
 
-function getSpeaker() {
-    chrome.storage.sync.get('speaker', function (data) {
-        if (data.speaker) {
-            return data.speaker;
-        } else {
-            return "onyx";
-        }
-    });
-}
-
-async function getModelType() {
-    const modelType = await chrome.storage.sync.get('model', function (data) {
-        if (data.model) {
-            if (data.model === 'standard') {
-                return "tts-1";
-            } else if (data.model === 'hd') {
-                return "tts-1-hd";
-            }
-        } else {
-            return "tts-1";
-        }
-    });
-}
-
+// Register to be called from onboarding script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === "tryIt") {
+        ReadText('You can use me for reading an entire page by right clicking and selecting Read everything to me! You can also select parts by marking it and right clicking. You can change the settings of my speed, voice and model in the extension. You can also see approximately how much you have spent.', sender.tab.id);
+    } else if (message.action === "setIcon") {
+        setExtensionProcessing(message.state, sender.tab.id);
+    }
+});
 
 function processChunks(chunks, index, tabId) {
     if (index >= chunks.length) return; // Stop when all chunks are processed
-
+    if (index === 0) {
+        setExtensionProcessing("processing", tabId);
+    } else {
+        setExtensionProcessing("processing", tabId);
+    }
     // Process the chunk (e.g., send to an API to get audio data)
     // For demonstration, let's assume we call a function `processChunk(chunk)`
     processChunk(chunks[index])
         .then(audioData => {
-            chrome.tabs.sendMessage(tabId, { type: "audioData", data: audioData });
-            setTimeout(() => processChunks(chunks, index + 1, tabId), 1000);
+            chrome.tabs.sendMessage(tabId, { action: "audioData", data: audioData });
+            setTimeout(() => processChunks(chunks, index + 1, tabId), SENTENCE_DELAY);
         })
         .catch(error => {
             console.error('Error processing chunk:', error);

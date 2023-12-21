@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>The Lazy Reader</title>
+    <script src="content.js"></script>
+    <script src="onboarding.js" defer></script>
+</head>
+<body>
+    <h1>The Lazy Reader</h1>
+    <h3>You will never have to read again...</h3>
+    <p>Please enter your OpenAI API key, its only stored locally!</p>
+    <form id="apiKeyForm">
+    <input type="text" id="apiKey" placeholder="Your API key" style="width: 400px;">
+        <button type="submit">Save</button>
+    </form>
+    <div id="response" style="visibility: hidden">
+        <div>Your key was saved. You can close this window now.</div>
+    </br>
+        <button id="tryItBtn">Try it!</button>
+        <div>You can use me for reading an entire page by right clicking and selecting 'Read everything to me!' You can also select parts by marking it and right clicking..</div>
+        <div>You can change the settings of my speed, voice and model in the extension. You can also see aprroximately how much you have spent.</div>
+    </div>
+</body>
+</html>
