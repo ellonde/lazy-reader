@@ -17,4 +17,4 @@ And onboarding page will appear where you'll need to provide your OpenAI API key
 
 [If you dont know how to get one of those]( https://letmegooglethat.com/?q=how+to+get+openai+api+key)
 
-You paste your key, (dont worry it just stored locally) and this should be working. You an try it on the onboarding page or try to navigate to a site and right click some marked text.
+You paste your key, (dont worry it just stored locally) and this should be working. You can try it on the onboarding page or try to navigate to a site and right click some marked text.
